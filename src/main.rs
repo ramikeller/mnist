@@ -1,4 +1,5 @@
 mod data;
+mod inference;
 mod model;
 mod training;
 
@@ -8,10 +9,18 @@ use burn::optim::AdamConfig;
 use model::ModelConfig;
 use training::{TrainingConfig, train};
 
-type Backend = Autodiff<Wgpu>;
+// Autodiff<Wgpu> for training (needs gradient tracking).
+// Plain Wgpu for inference (forward pass only, no overhead).
+type TrainBackend = Autodiff<Wgpu>;
+type InferBackend = Wgpu;
 
 fn main() {
     let device = WgpuDevice::default();
-    let config = TrainingConfig::new(ModelConfig::new(), AdamConfig::new());
-    train::<Backend>(config, device);
+
+    // Comment out whichever you don't need.
+    train::<TrainBackend>(
+        TrainingConfig::new(ModelConfig::new(), AdamConfig::new()),
+        device.clone(),
+    );
+    inference::infer::<InferBackend>(device);
 }
