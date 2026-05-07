@@ -1,45 +1,27 @@
+mod data;
+
+use burn::backend::ndarray::NdArrayDevice;
 use burn::backend::NdArray;
-use burn::data::dataset::vision::{MnistDataset, MnistItem};
+use burn::data::dataloader::batcher::Batcher;
+use burn::data::dataset::vision::MnistDataset;
 use burn::data::dataset::Dataset;
+use data::{MnistBatch, MnistBatcher};
 
 type Backend = NdArray;
 
-fn display_image(item: &MnistItem) {
-    println!("Label: {}", item.label);
-    for row in &item.image {
-        for &pixel in row {
-            // Map pixel brightness to ASCII characters
-            let ch = if pixel < 50.0 {
-                ' '
-            } else if pixel < 150.0 {
-                '.'
-            } else {
-                '#'
-            };
-            print!("{ch}{ch}"); // print twice so it looks square in the terminal
-        }
-        println!();
-    }
-}
-
 fn main() {
-    println!("Loading MNIST dataset...");
-    let train = MnistDataset::train();
-    let test = MnistDataset::test();
+    let device = NdArrayDevice::Cpu;
 
-    println!("Training samples : {}", train.len());
-    println!("Test samples     : {}", test.len());
+    let dataset = MnistDataset::train();
+    println!("Dataset size: {}", dataset.len());
 
-    // Inspect the very first training image
-    println!("\n--- First training image ---");
-    let first = train.get(0).expect("Dataset is empty");
-    display_image(&first);
+    // Grab the first 4 items and hand them to the batcher
+    let items: Vec<_> = (0..4).map(|i| dataset.get(i).unwrap()).collect();
 
-    // Show a few labels to get a feel for the data
-    println!("\nFirst 10 labels:");
-    for i in 0..10 {
-        let item = train.get(i).unwrap();
-        print!("{} ", item.label);
-    }
-    println!();
+    let batcher = MnistBatcher;
+    let batch: MnistBatch<Backend> = batcher.batch(items, &device);
+
+    println!("Images tensor shape : {:?}", batch.images.shape());
+    println!("Targets tensor shape: {:?}", batch.targets.shape());
+    println!("Targets (labels)    : {}", batch.targets);
 }
