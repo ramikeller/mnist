@@ -1,11 +1,13 @@
 use burn::{
     config::Config,
     module::Module,
-    nn::{Linear, LinearConfig, Relu},
-    tensor::{backend::Backend, Tensor},
+    nn::{loss::CrossEntropyLossConfig, Linear, LinearConfig, Relu},
+    tensor::{Int, Tensor, backend::AutodiffBackend, backend::Backend},
+    train::{ClassificationOutput, InferenceStep, TrainOutput, TrainStep},
 };
 
-/// Hyperparameters — how big is each layer?
+use crate::data::MnistBatch;
+
 #[derive(Config, Debug)]
 pub struct ModelConfig {
     #[config(default = "512")]
@@ -16,7 +18,6 @@ pub struct ModelConfig {
     pub num_classes: usize,
 }
 
-/// The network itself: three learned linear transformations.
 #[derive(Module, Debug)]
 pub struct Model<B: Backend> {
     linear1: Linear<B>,
@@ -37,18 +38,46 @@ impl ModelConfig {
 }
 
 impl<B: Backend> Model<B> {
-    /// Takes a batch of images, returns raw scores (logits) for each digit class.
     pub fn forward(&self, images: Tensor<B, 3>) -> Tensor<B, 2> {
         let [batch_size, height, width] = images.dims();
-
-        // Flatten [B, 28, 28] → [B, 784] so a Linear layer can process it
         let x = images.reshape([batch_size, height * width]);
-
-        // Each linear() learns a transformation; relu() adds non-linearity
         let x = self.activation.forward(self.linear1.forward(x));
         let x = self.activation.forward(self.linear2.forward(x));
-
-        // Final layer: no activation — raw logits for the loss function
         self.linear3.forward(x)
+    }
+
+    // Shared by training and validation: forward pass + loss computation.
+    pub fn forward_classification(
+        &self,
+        images: Tensor<B, 3>,
+        targets: Tensor<B, 1, Int>,
+    ) -> ClassificationOutput<B> {
+        let output = self.forward(images);
+        let loss = CrossEntropyLossConfig::new()
+            .init(&output.device())
+            .forward(output.clone(), targets.clone());
+        ClassificationOutput::new(loss, output, targets)
+    }
+}
+
+// Training step: forward + backward pass. Runs on the Autodiff-wrapped backend.
+impl<B: AutodiffBackend> TrainStep for Model<B> {
+    type Input = MnistBatch<B>;
+    type Output = ClassificationOutput<B>;
+
+    fn step(&self, batch: MnistBatch<B>) -> TrainOutput<ClassificationOutput<B>> {
+        let item = self.forward_classification(batch.images, batch.targets);
+        TrainOutput::new(self, item.loss.backward(), item)
+    }
+}
+
+// Inference step: forward pass only. Used for validation (no gradient tracking needed).
+// The Learner calls this on Model<B::InnerBackend> (the non-autodiff version of the model).
+impl<B: Backend> InferenceStep for Model<B> {
+    type Input = MnistBatch<B>;
+    type Output = ClassificationOutput<B>;
+
+    fn step(&self, batch: MnistBatch<B>) -> ClassificationOutput<B> {
+        self.forward_classification(batch.images, batch.targets)
     }
 }
