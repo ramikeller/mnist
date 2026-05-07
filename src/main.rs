@@ -1,24 +1,45 @@
 use burn::backend::NdArray;
-use burn::tensor::Tensor;
+use burn::data::dataset::vision::{MnistDataset, MnistItem};
+use burn::data::dataset::Dataset;
 
-// Give our backend a short alias. Later we'll swap this one line to change hardware.
 type Backend = NdArray;
 
+fn display_image(item: &MnistItem) {
+    println!("Label: {}", item.label);
+    for row in &item.image {
+        for &pixel in row {
+            // Map pixel brightness to ASCII characters
+            let ch = if pixel < 50.0 {
+                ' '
+            } else if pixel < 150.0 {
+                '.'
+            } else {
+                '#'
+            };
+            print!("{ch}{ch}"); // print twice so it looks square in the terminal
+        }
+        println!();
+    }
+}
+
 fn main() {
-    // "Device" is a handle to the GPU. Default picks Metal on macOS automatically.
-    let device = Default::default();
+    println!("Loading MNIST dataset...");
+    let train = MnistDataset::train();
+    let test = MnistDataset::test();
 
-    // A 2D tensor (matrix): 2 rows, 3 columns
-    let a = Tensor::<Backend, 2>::from_data([[1.0f32, 2.0, 3.0], [4.0, 5.0, 6.0]], &device);
-    let b = Tensor::<Backend, 2>::from_data([[10.0f32, 20.0, 30.0], [40.0, 50.0, 60.0]], &device);
+    println!("Training samples : {}", train.len());
+    println!("Test samples     : {}", test.len());
 
-    println!("a =\n{a}");
-    println!("b =\n{b}");
+    // Inspect the very first training image
+    println!("\n--- First training image ---");
+    let first = train.get(0).expect("Dataset is empty");
+    display_image(&first);
 
-    // This addition runs on the M4 GPU via Metal
-    let sum = a + b;
-    println!("a + b =\n{sum}");
-
-    // Shape tells you the dimensions: [rows, columns]
-    println!("Shape: {:?}", sum.shape());
+    // Show a few labels to get a feel for the data
+    println!("\nFirst 10 labels:");
+    for i in 0..10 {
+        let item = train.get(i).unwrap();
+        print!("{} ", item.label);
+    }
+    println!();
 }
