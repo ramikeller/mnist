@@ -8,17 +8,33 @@ A handwritten digit classifier built from scratch using the [Burn](https://burn.
 
 ## What it does
 
-Trains a Multi-Layer Perceptron (MLP) on the MNIST dataset — 70,000 grayscale 28×28 images of handwritten digits (0–9). After training, loads the saved weights and runs predictions on individual images.
+Trains a Multi-Layer Perceptron (MLP) on the MNIST dataset — 70,000 grayscale 28×28 images of handwritten digits (0–9). After training, loads the saved weights and runs predictions on 4 individual images. For example given this input, predicts:
 
 ```
-                          ######
-                          ######..
-                        ########..
-                    ..############....
-                    ##################..
+                    ..##              ..
+                    ..##              ..##
+                    ####              ..##
+                  ..##..              ..##
+                  ####                ####
+                ####..                ####
+              ..####                ..####
+              ####..                ####..
+              ####                ..####
+              ####                ######
+              ####                ####..
+              ######..........########..
+                ######################
+                    ........    ######
+                                ..####
+                                ..####
+                                ..####
+                                ..####
+                                ####..
+                                ##..
 
-True label : 0
-Predicted  : 0
+
+True label : 4
+Predicted  : 4
 ✓ correct
 ```
 
@@ -39,18 +55,17 @@ src/
 
 ## How to run
 
-**Train and infer (GPU):**
+**Train and infer (GPU — default):**
 ```bash
 cargo run --release
 ```
 
-**Switch to CPU** — change two lines in `src/main.rs`:
-```rust
-type TrainBackend = Autodiff<NdArray>;
-type InferBackend = NdArray;
-// and
-let device = NdArrayDevice::Cpu;
+**Train and infer (CPU):**
+```bash
+cargo run --release -- --cpu
 ```
+
+The `--cpu` flag switches the backend from Wgpu (Metal/GPU) to NdArray (CPU) at runtime — no code changes needed.
 
 Checkpoints are saved to `./artifact/checkpoint/`.
 
